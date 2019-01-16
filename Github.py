@@ -12,10 +12,26 @@ class GitHub:
     def __init__(self, **kwargs):
         self.owner = kwargs['owner']
         self.repositories = kwargs['repositories']
-        self.resources = kwargs['resources']   
+        self.resources = kwargs['resources']
+
+        self.validate_owner()   
+        self.validate_repositories()
         self.validate_resources()
 
         self.data_generator = self.data_generator()
+
+    def validate_owner(self):
+        request_address = constants.GITHUB_API + constants.GITHUB_API_USERS + self.owner
+        request_response = requests.get(request_address)
+        if not(request_response.ok):
+            raise Exception(self.owner + ' is not a valid owner!')
+
+    def validate_repositories(self):
+        for repository in self.repositories:
+            request_address = constants.GITHUB_API + constants.GITHUB_API_REPOS + self.owner + '/' + repository
+            request_response = requests.get(request_address)
+            if not(request_response.ok):
+                raise Exception(repository + ' is not a valid repository!')
 
     def validate_resources(self):
         for resource in self.resources:
@@ -28,10 +44,16 @@ class GitHub:
                 request_address = constants.GITHUB_API + constants.GITHUB_API_REPOS + self.owner + '/' + repository + '/' + resource                
                 has_next = True
                 while has_next:
+                    print(repository + ' -> ' + resource)
                     request_response = requests.get(request_address)
-                    yield request_response.json()
-                    if 'next' in request_response.links:
-                        request_address = request_response.links['next']['url']
+                    json_response = request_response.json()
+                    if json_response:
+                        if 'next' in request_response.links:
+                            print('entering next')
+                            request_address = request_response.links['next']['url']
+                        else:
+                            has_next = False
+                        yield json_response
                     else:
                         has_next = False
         print('reached this point')
@@ -41,18 +63,14 @@ class GitHub:
         return next(self.data_generator)
 
 if __name__ == "__main__":
-    # gh = GitHub(owner='scrapinghub', repositories=['frontera'], resources=['issues','pulls','comments'])
-    gh = GitHub(owner='scrapinghub', repositories=['frontera'], resources=['issues'])
+    gh = GitHub(owner='scrapinghub', repositories=['frontera','hubris'], resources=['issues','pulls','comments'])
+    # gh = GitHub(owner='joshuatimothyg', repositories=['chiffon-problems'], resources=['issues'])
 
-    data1 = gh.read()
-    for item in data1:
-        print(item['id'])
-    print('nextbatch')
-    data2 = gh.read()
-    for item in data2:
-        print(item['id'])
-    print('nextbatch')
-    data3 = gh.read()
-    for item in data3:
-        print(item['id'])
+    data = gh.read()
+    while data is not None:
+        for item in data:
+            print(item['id'])
+        print('-------nextbatch')
+        data = gh.read()
+
 
