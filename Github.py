@@ -1,63 +1,58 @@
 #!/usr/bin/env python3
 
+import constants
 import urllib.parse
 import requests
 import json
 
 class GitHub:
 
+# supported: issues, pulls, comments
+
     def __init__(self, **kwargs):
         self.owner = kwargs['owner']
-        self.owner_type = self.get_user_type()
         self.repositories = kwargs['repositories']
-        self.resources = kwargs['resources']
+        self.resources = kwargs['resources']   
+        self.validate_resources()
 
-        self.base_address = 'https://api.github.com/' + self.owner_type + self.owner
-        print(self.base_address)
+        self.data_generator = self.data_generator()
 
-    def get_user_type(self):
-        user_types_dict = { 'User' : 'users/',
-                            'Organization': 'orgs/' }
+    def validate_resources(self):
+        for resource in self.resources:
+            if resource not in constants.VALID_RESOURCES:
+                raise Exception(resource + ' is not a supported resource!')
 
-        base_address = 'https://api.github.com/search/users?q='
-        request_address = base_address + self.owner
-
-        json_result = requests.get(request_address).json()
-
-        for item in json_result['items']:
-            if(item['login'] == self.owner):
-                return user_types_dict[item['type']]
-
-        raise Exception('User ' + self.owner + ' not found!')
-
-"""
-    def read(self):
-        
-
+    def data_generator(self):
         for repository in self.repositories:
             for resource in self.resources:
+                request_address = constants.GITHUB_API + constants.GITHUB_API_REPOS + self.owner + '/' + repository + '/' + resource                
+                has_next = True
+                while has_next:
+                    request_response = requests.get(request_address)
+                    yield request_response.json()
+                    if 'next' in request_response.links:
+                        request_address = request_response.links['next']['url']
+                    else:
+                        has_next = False
+        print('reached this point')
+        yield None
 
-
-        request_address = self.base_address + urllib.parse.urlencode({'page':self.page})
-        print(request_address)
-        json_data = requests.get(request_address).json()
-
-        self.page += 1
-
-        return json_data
-"""
+    def read(self):
+        return next(self.data_generator)
 
 if __name__ == "__main__":
-    gh = GitHub(owner='joshuatimothyg', repositories='', resources='')
-    gh = GitHub(owner='scrapinghub', repositories='', resources='')
-    gh = GitHub(owner='arden2', repositories='', resources='')
+    # gh = GitHub(owner='scrapinghub', repositories=['frontera'], resources=['issues','pulls','comments'])
+    gh = GitHub(owner='scrapinghub', repositories=['frontera'], resources=['issues'])
 
-    #print(gh.read())
+    data1 = gh.read()
+    for item in data1:
+        print(item['id'])
+    print('nextbatch')
+    data2 = gh.read()
+    for item in data2:
+        print(item['id'])
+    print('nextbatch')
+    data3 = gh.read()
+    for item in data3:
+        print(item['id'])
 
-"""
-
-data = gh.read()
-while data is not None:
-    # do something with the data
-    data = gh.read() # fetch next batch
-"""
