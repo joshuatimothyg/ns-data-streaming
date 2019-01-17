@@ -1,5 +1,0 @@
-
-class GitHubAuth:
-
-    def __init__(self):
-    
